@@ -20,8 +20,8 @@ module {
                 #Text      : Text           ;
                 #Blob      : Blob           ;
                 #Principal : Principal      ;
-                #Document  : Document.Value ;
-                #Optional  : ?Value         ;
+                #Document  : Document.Value ; // HZL TODO : Do we really want to support nested documents? Or, should this be a refence type. 
+                #Optional  : ?Value         ; 
             };
             public type Type = {
                 #Nat                       ;
@@ -118,6 +118,10 @@ module {
             return Trie.find(v.docType.structure, keyFromText(f), Text.equal);
         };
 
+        public func getFieldValue(v : Document.Value, f : Text) : ?Value.Value {
+            return Trie.find(v.data, keyFromText(f), Text.equal);
+        };
+
         public type UpdateResult = Result.Result<(), {#TypeMismatch : Value.Type; #FieldNotFound}>;
 
         public func updateField(d : Document.Value, f : Text, v : Value.Value) : UpdateResult {
@@ -157,41 +161,84 @@ module {
         public type Type = {
             #Unique     ;
             #SingleField;
-            #Compound   ;
+            //#Compound   ;
+        };
+
+        type Document  = Document.Value           ;
+        type Documents = List.List<Document.Value>;
+
+        module HashIndex = {
+            public type Type<V> = Trie.Trie<Value.Value, V>; 
+
+            public func addToIndex() {
+
+            };
         };
 
         public type IndexType<V> = {
-            #Hash    : Trie.Trie<Value.Value, V>;
-            #Ordered : RBTree.Tree<Value.Value, V>;
+            #Hash    : HashIndex.Type<V>          ;  // Non ordered index stashed in a Binary Hash Trie
+            #Ordered : RBTree.Tree<Value.Value, V>;  // Ordered index stashed in a RBTree
+        };
+        
+        module UniqueIndex = {
+            public type Type = IndexType<Document.Value>;  // One to One Index
+            public func addToIndex(idx : Type, k : Value.Value, v : Document.Value) {
+
+            };
         };
 
-        public type CompoundIndexValue = Text;
+        public type SingleField = IndexType<Documents>;  // One to Many Index
 
-        public type UniqueIndex = IndexType<Document.Value>;
-        public type SingleField = IndexType<List.List<Document.Value>>;
+        //public type CompoundIndexValue = Text;
         //public type Compound    = {data : Trie.Trie<Value.Value, List.List<Document.Value>>; qualifier : [Text]};
         public type Data = {
-            #Unique      : UniqueIndex;
+            #Unique      : UniqueIndex.Type;
             #SingleField : SingleField;
             //#Compound    : Compound   ; Lets figure this out later..
         };
 
         public type Value = {
-            name     : Text;
-            typeName : Type;
-            value    : Data;
-            target   : Text;
+            name      : Text;       // Reference name of the index
+            //typeName  : Type;       // Type of the index. Ie : Unique
+            var value : Data;       // Backing Datastore of the index
+            target    : Text;       // Collection Field the index is targeting
+        };
+
+        public func putDocument(idx : Value, d : Document.Value) : () {
+            switch(Document.getFieldValue(d, idx.target)) {
+                case null {return};
+                case (?value) {
+
+                };
+            };
+        };
+
+        func putValue(idx : Value, k : Value.Value, d : Document.Value) : Result.Result<(), ()>{
+            switch(idx.value) {
+                //case (#Compound(compound)) {};
+                case (#Unique(idxData)) {};
+                case (#SingleField(idxData)) {}
+            };
+            #ok(); // HZL TODO
+        };
+
+        func handleSingleField(idx : Value, idxData : SingleField, k : Value.Value, d : Document.Value) : Result.Result<(), ()> {
+            switch(idxData) {
+                case (#Hash(data)) {};
+                case (#Ordered(data)) {};
+            };
+            #ok(); // HZL TODO
         };
     };
 
     module Collection {
-        public type Type = {#Collection};
+        public type Type  = {#Collection};
         public type Value = {
-            var autoId        : Nat                             ;
-            typeName          : Text                            ;
-            var structure     : Trie.Trie<Text, Value.Type>     ;
-            var documents     : Trie.Trie<Nat, Document.Value>  ;
-            var indicies      : List.List<CollectionIndex.Value>;
+            var autoId        : Nat                             ;  // Next id for a document on create
+            typeName          : Text                            ;  // Name of the collection. Ie "Cars"
+            var structure     : Trie.Trie<Text, Value.Type>     ;  // Structure of collection Record Field Name -> ValueType
+            var documents     : Trie.Trie<Nat, Document.Value>  ;  // Backing Data
+            var indicies      : List.List<CollectionIndex.Value>;  // Search Indices 
         };
 
         public type InsertionResult = Result.Result<Nat, {#StructureError}>;
@@ -213,6 +260,10 @@ module {
                 case null return null;
                 case (?v) return ?Document.toPublic(v);
             };
+        };
+
+        public func typeOfField(c : Collection.Value, f : Text) : ?Value.Type {
+            Trie.find(c.structure, keyFromText(f), Text.equal)
         };
 
         func buildDocumentForCollection(c : Collection.Value, v : [(Text, Value.Value)]) : Result.Result<Document.Value, {#StructureError}> {
@@ -237,10 +288,6 @@ module {
                 docType  = c      ;
                 var data = values ;
             });
-        };
-
-        public func typeOfField(c : Collection.Value, f : Text) : ?Value.Type {
-            Trie.find(c.structure, keyFromText(f), Text.equal)
         };
     };
 
