@@ -160,15 +160,20 @@ module {
             #Compound   ;
         };
 
+        public type IndexType<V> = {
+            #Hash    : Trie.Trie<Value.Value, V>;
+            #Ordered : RBTree.Tree<Value.Value, V>;
+        };
+
         public type CompoundIndexValue = Text;
 
-        public type UniqueIndex = Trie.Trie<Value.Value, Document.Value>;
-        public type SingleField = Trie.Trie<Value.Value, List.List<Document.Value>>;
-        public type Compound    = {data : Trie.Trie<Value.Value, List.List<Document.Value>>; qualifier : [Text]};
+        public type UniqueIndex = IndexType<Document.Value>;
+        public type SingleField = IndexType<List.List<Document.Value>>;
+        //public type Compound    = {data : Trie.Trie<Value.Value, List.List<Document.Value>>; qualifier : [Text]};
         public type Data = {
             #Unique      : UniqueIndex;
             #SingleField : SingleField;
-            #Compound    : Compound   ;
+            //#Compound    : Compound   ; Lets figure this out later..
         };
 
         public type Value = {
