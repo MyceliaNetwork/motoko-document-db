@@ -22,61 +22,31 @@ module {
   // stable var treeData : Tree<X, Y> = (#leaf : Tree<X, Y>);
   // let tree = RBTree<X, Y>(.. compare, .. getter, .. setter);
   // :) Done!
+  public type Compare<X> = (X, X) -> O.Order;
 
-  /// Create an order map from an order function for its keys.
-  public class RBTree<X, Y>(compareTo : (X, X) -> O.Order, getTree : () -> Tree<X, Y>, setTree : (t : Tree<X, Y>) -> ()) {
-    /// Tree as sharable data.
-    ///
-    /// Get non-OO, purely-functional representation:
-    /// for drawing, pretty-printing and non-OO contexts
-    /// (e.g., async args and results):
-    public func share() : Tree<X, Y> {
-      getTree();
-    };
-
-    /// Get the value associated with a given key.
-    public func get(x : X) : ?Y {
-      getRec(x, compareTo, getTree());
-    };
-
-    /// Replace the value associated with a given key.
-    public func replace(x : X, y : Y) : ?Y {
-      let (res, t) = insertRoot(x, compareTo, y, getTree());
-      setTree(t);
-      res
-    };
-
-    /// Put an entry: A value associated with a given key.
-    public func put(x : X, y : Y) {
-      let (res, t) = insertRoot(x, compareTo, y, getTree());
-      setTree(t);
-    };
-
-    /// Delete the entry associated with a given key.
-    public func delete(x : X) {
-      let (res, t) = removeRec(x, compareTo, getTree());
-      setTree(t)
-    };
-
-    /// Remove the entry associated with a given key.
-    public func remove(x : X) : ?Y {
-      let (res, t) = removeRec(x, compareTo, getTree());
-      setTree(t);
-      res
-    };
-
-    /// An iterator for the key-value entries of the map, in ascending key order.
-    ///
-    /// iterator is persistent, like the tree itself
-    public func entries() : I.Iter<(X, Y)> { iter(getTree(), #fwd) };
-
-    /// An iterator for the key-value entries of the map, in descending key order.
-    ///
-    /// iterator is persistent, like the tree itself
-    public func entriesRev() : I.Iter<(X, Y)> { iter(getTree(), #bwd) };
-
+  public func get<X, Y>(t : Tree<X, Y>, comp : Compare<X>, x : X) : ?Y {
+    getRec(x, comp, t);
   };
 
+  /// Put an entry: A value associated with a given key.
+  public func put<X, Y>(t : Tree<X, Y>, comp : Compare<X>, x : X, y : Y) : (?Y, Tree<X, Y>) {
+    insertRoot(x, comp, y, t);
+  };
+
+  /// Delete the entry associated with a given key.
+  public func delete<X, Y>(t : Tree<X, Y>, comp : Compare<X>, x : X) : (?Y, Tree<X, Y>) {
+    removeRec(x, comp, t);
+  };
+
+  /// An iterator for the key-value entries of the map, in ascending key order.
+  ///
+  /// iterator is persistent, like the tree itself
+  public func entries<X, Y>(t : Tree<X, Y>) : I.Iter<(X, Y)> { iter(t, #fwd) };
+
+  /// An iterator for the key-value entries of the map, in descending key order.
+  ///
+  /// iterator is persistent, like the tree itself
+  public func entriesRev<X, Y>(t : Tree<X, Y>) : I.Iter<(X, Y)> { iter(t, #bwd) };
 
   type IterRep<X, Y> = List.List<{ #tr:Tree<X, Y>; #xy:(X, ?Y) }>;
 

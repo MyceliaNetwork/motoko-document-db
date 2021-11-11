@@ -2,47 +2,58 @@ import Blob "mo:base/Blob";
 import Collection "mo:base/Array";
 import Document "mo:base/Array";
 import ExperimentalStorage "mo:base/ExperimentalStableMemory";
+import Float "mo:base/Float";
 import Hash "mo:base/Hash";
 import Int "mo:base/Int";
+import Int64 "mo:base/Int64";
 import List "mo:base/List";
 import Nat "mo:base/Nat";
+import Nat64 "mo:base/Nat64";
+import Option "mo:base/Option";
+import Optiona "mo:base/Option";
+import Order "mo:base/Order";
+import P "mo:base/Prelude";
 import Principal "mo:base/Principal";
+import RBTree "RBTree";
 import Result "mo:base/Result";
 import Text "mo:base/Text";
 import Trie "mo:base/Trie";
-import RBTree "RBTree";
+import Value "mo:base/Array";
 
 module {
     module Value = {
             public type Value = {
-                #Nat       : Nat            ;
-                #Int       : Int            ;
-                #Text      : Text           ;
-                #Blob      : Blob           ;
-                #Principal : Principal      ;
-                #Document  : Document.Value ; // HZL TODO : Do we really want to support nested documents? Or, should this be a refence type. 
-                #Optional  : ?Value         ; 
+                #Nat       : Nat64                 ;
+                #Int       : Int64                 ;
+                #Float     : Float                 ;
+                #Text      : Text                  ;
+                #Blob      : Blob                  ;
+                #Principal : Principal             ;
+                #Document  : Document.Value        ; // HZL TODO : Do we really want to support nested documents? Or, should this be a refence type. 
+                #Optional  : {v : ?Value; t : Type}; 
             };
             public type Type = {
-                #Nat                       ;
-                #Int                       ;
-                #Text                      ;
-                #Blob                      ;
-                #Principal                 ;
-                #Document   : Document.Type;
-                #Optional   : ?Type        ;
+                #Nat                               ;
+                #Int                               ;
+                #Float                             ;
+                #Text                              ;
+                #Blob                              ;
+                #Principal                         ;
+                #Document   : Document.Type        ;
+                #Optional   : Type                 ;
             };
 
             public func hash(v : Value.Value) : Hash.Hash {
                 switch(v) {
-                    case (#Nat(v)) {Hash.hash v};
-                    case (#Int(v)) {Int.hash v};
+                    case (#Nat(v)) {Hash.hash(Nat64.toNat(v))};
+                    case (#Int(v)) {Int.hash(Int64.toInt(v))};
+                    case (#Float(v)) {Text.hash(Float.toText(v))};
                     case (#Text(v)) {Text.hash v};
                     case (#Principal(v)) {Principal.hash v};
                     case (#Blob(v)) {Blob.hash v};
                     case (#Document(v)) {Document.hash(v)};
                     case (#Optional(v)) {
-                        switch(v) {
+                        switch(v.v) {
                             case null return 0;
                             case (?value) return hash(value);
                         };
@@ -50,8 +61,99 @@ module {
                 };
             };
 
+            public func compare(l : Value.Value, r : Value.Value) : Order.Order {
+                assert sameType(typeOf(l), typeOf(r));
+
+                switch(l) {
+                    case (#Nat(v)) {
+                        return Nat64.compare(v, Unwrap.nat(r));
+                    };
+                    case (#Int(v)) {
+                        return Int64.compare(v, Unwrap.int(r));
+                    };
+                    case (#Float(v)) {
+                        return Float.compare(v, Unwrap.float(r));
+                    };
+                    case (#Text(v)) {
+                        return Text.compare(v, Unwrap.text(r));
+                    };
+                    case (#Principal(v)) {
+                        return Principal.compare(v, Unwrap.principal(r));
+                    };
+                    case (#Blob(v)) {
+                        return Blob.compare(v, Unwrap.blob(r));
+                    };
+                    case (#Document(v)) {
+                        return Nat.compare(v.id, Unwrap.document(r).id);
+                    };
+                    case (#Optional(v)) {
+                        let rR = Unwrap.optional(r);
+                        switch(v.v) {
+                            case (null) {
+                                if (Option.isNull(rR)) {
+                                    return #equal;
+                                };
+                                return #less;
+                            };
+                            case (?v)  {
+                                switch rR {
+                                    case null return #greater;
+                                    case (?rRValue) {return compare(v, rRValue)};
+                                };
+                            };
+                        };
+                    };
+                };
+            };
+            
+            module Unwrap {
+                public func nat(v0 : Value) : Nat64 {
+                    switch(v0) { case (#Nat(v)) return v; case _ {assert false}};
+                    P.unreachable();
+                };
+
+                public func int(v0 : Value) : Int64 {
+                    switch(v0) { case (#Int(v)) return v; case _ {assert false}};
+                    P.unreachable();
+                };
+
+                public func float(v0 : Value) : Float {
+                    switch(v0) { case (#Float(v)) return v; case _ {assert false}};
+                    P.unreachable();
+                };
+
+                public func text(v0 : Value) : Text {
+                    switch(v0) { case (#Text(v)) return v; case _ {assert false}};
+                    P.unreachable();
+                };
+
+                public func principal(v0 : Value) : Principal {
+                    switch(v0) { case (#Principal(v)) return v; case _ {assert false}};
+                    P.unreachable();
+                };
+
+                public func blob(v0 : Value) : Blob {
+                    switch(v0) { case (#Blob(v)) return v; case _ {assert false}};
+                    Blob.fromArray([]);
+                };
+
+                public func document(v0 : Value) : Document.Value {
+                    switch(v0) { case (#Document(v)) return v; case _ {assert false}};
+                    P.unreachable();
+                };
+
+                public func optional(v0 : Value) :?Value.Value {
+                    switch(v0) { case (#Optional(v)) return v.v; case _ {assert false}};
+                    P.unreachable();
+                };
+            };
+
             public func key(v : Value) : Trie.Key<Value> {
                 {key = v; hash = hash(v)};
+            };
+
+            public func equal(l : Value, r : Value) : Bool {
+                return hash(l) == hash(r) and typeHash(typeOf(l)) == typeHash(typeOf(r));
             };
 
             public func typeOf(v : Value) : Type {
@@ -62,12 +164,8 @@ module {
                     case (#Principal(_)) {#Principal};
                     case (#Document(v))  {#Document(v.docType)};
                     case (#Blob(_))      {#Blob};
-                    case (#Optional(v))  {
-                        switch(v) {
-                            case null     return #Optional(null);
-                            case (?value) return #Optional(?typeOf(value));
-                        };
-                    };
+                    case (#Float(_))     {#Float};
+                    case (#Optional(v))  {#Optional(v.t)};
                 };
             };
 
@@ -79,12 +177,8 @@ module {
                     case (#Principal(_)) {3};
                     case (#Document(v))  {4};
                     case (#Blob(_))      {5};
-                    case (#Optional(v))  {
-                        switch(v) {
-                            case (null)   return 6;
-                            case (?value) return typeHash(value);
-                        };
-                    };
+                    case (#Optional(v))  {return 1000 + typeHash(v) + 1;};
+                    case (#Float(_))         {100}
                 };
             };
 
@@ -167,27 +261,53 @@ module {
         type Document  = Document.Value           ;
         type Documents = List.List<Document.Value>;
 
+        public type IndexValue = {
+            #Document  : Document;
+            #Documents : Documents;
+        };
+
         module HashIndex = {
-            public type Type<V> = Trie.Trie<Value.Value, V>; 
+            public type Type = Trie.Trie<Value.Value, IndexValue>; 
 
-            public func addToIndex() {
+            // Add a key to the index. Overwriting the existing value
+            public func addToIndex(idx : Type, k : Value.Value, v : IndexValue) : (Type, ?IndexValue) {
+                let key = Value.key(k);
+                return Trie.put<Value.Value, IndexValue>(idx, key, Value.equal, v);
+            };
 
+            // Find a value in the index
+            public func findInIndex(idx : Type, k : Value.Value) : ?IndexValue {
+                let key = Value.key(k);
+                return Trie.find(idx, key, Value.equal);
             };
         };
 
-        public type IndexType<V> = {
-            #Hash    : HashIndex.Type<V>          ;  // Non ordered index stashed in a Binary Hash Trie
-            #Ordered : RBTree.Tree<Value.Value, V>;  // Ordered index stashed in a RBTree
+        module OrderedIndex = {
+            public type Type = RBTree.Tree<Value.Value, IndexValue>;
+
+            // Add a key to the index. Overwriting the existing value
+            public func addToIndex(idx : Type, k : Value.Value, v : IndexValue) : (?IndexValue, Type) {
+                RBTree.put<Value.Value, IndexValue>(idx, Value.compare, k, v);
+            };
+            
+            public func findInIndex(idx : Type, k : Value.Value) : ?IndexValue {
+                RBTree.get(idx, Value.compare, k);
+            };
+        };
+
+        public type IndexType = {
+            #Hash    : HashIndex.Type                      ;  // Non ordered index stashed in a Binary Hash Trie
+            #Ordered : RBTree.Tree<Value.Value, IndexValue>;  // Ordered index stashed in a RBTree
         };
         
         module UniqueIndex = {
-            public type Type = IndexType<Document.Value>;  // One to One Index
+            public type Type = IndexType;  // One to One Index
             public func addToIndex(idx : Type, k : Value.Value, v : Document.Value) {
 
             };
         };
 
-        public type SingleField = IndexType<Documents>;  // One to Many Index
+        public type SingleField = IndexType;  // One to Many Index
 
         //public type CompoundIndexValue = Text;
         //public type Compound    = {data : Trie.Trie<Value.Value, List.List<Document.Value>>; qualifier : [Text]};
@@ -292,9 +412,9 @@ module {
     };
 
     module Database {
-        public type Type = {#Database};
+        public type Type  = {#Database};
         public type Value = {
-            name : Text;
+            name        : Text;
             collections : Trie.Trie<Text, Collection.Value>;
         };
     };
