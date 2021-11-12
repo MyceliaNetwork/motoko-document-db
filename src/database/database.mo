@@ -16,6 +16,7 @@ import P "mo:base/Prelude";
 import Principal "mo:base/Principal";
 import RBTree "RBTree";
 import Result "mo:base/Result";
+import Resust "mo:base/Result";
 import Text "mo:base/Text";
 import Trie "mo:base/Trie";
 import Value "mo:base/Array";
@@ -29,9 +30,10 @@ module {
                 #Text      : Text                  ;
                 #Blob      : Blob                  ;
                 #Principal : Principal             ;
-                #Document  : Document.Value        ; // HZL TODO : Do we really want to support nested documents? Or, should this be a refence type. 
+                #Document  : Document.Value        ; // HZL TODO : Do we really want to support nested documents? Or, should this be a refence type. {#Local : Document.Value; #Remote ...}
                 #Optional  : {v : ?Value; t : Type}; 
             };
+
             public type Type = {
                 #Nat                               ;
                 #Int                               ;
@@ -259,13 +261,14 @@ module {
         };
 
         type Document  = Document.Value           ;
-        type Documents = List.List<Document.Value>;
+        type Documents = List.List<Document.Value>; // HZL This isn't ideal. Should use a TrieSet.
 
         public type IndexValue = {
             #Document  : Document;
             #Documents : Documents;
         };
-
+        
+        // Index Value Store Types
         module HashIndex = {
             public type Type = Trie.Trie<Value.Value, IndexValue>; 
 
@@ -286,8 +289,9 @@ module {
             public type Type = RBTree.Tree<Value.Value, IndexValue>;
 
             // Add a key to the index. Overwriting the existing value
-            public func addToIndex(idx : Type, k : Value.Value, v : IndexValue) : (?IndexValue, Type) {
-                RBTree.put<Value.Value, IndexValue>(idx, Value.compare, k, v);
+            public func addToIndex(idx : Type, k : Value.Value, v : IndexValue) : (Type, ?IndexValue) {
+                let (a, b) = RBTree.put<Value.Value, IndexValue>(idx, Value.compare, k, v);
+                return (b, a);
             };
             
             public func findInIndex(idx : Type, k : Value.Value) : ?IndexValue {
@@ -295,6 +299,7 @@ module {
             };
         };
 
+        // Index Types
         public type IndexType = {
             #Hash    : HashIndex.Type                      ;  // Non ordered index stashed in a Binary Hash Trie
             #Ordered : RBTree.Tree<Value.Value, IndexValue>;  // Ordered index stashed in a RBTree
@@ -302,18 +307,77 @@ module {
         
         module UniqueIndex = {
             public type Type = IndexType;  // One to One Index
-            public func addToIndex(idx : Type, k : Value.Value, v : Document.Value) {
+            public type Error = {
+                #AlreadyExists;
+            };
 
+            public func addToIndex(idx : Type, k : Value.Value, v : Document.Value) : Resust.Result<Type, Error> {
+                switch(idx) {
+                    case (#Hash(data)) {
+                        switch(HashIndex.findInIndex(data, k)) {
+                            case null {
+                                return #ok(#Hash(HashIndex.addToIndex(data, k, #Document(v)).0));
+                            };
+                            case (?_) return #err(#AlreadyExists);
+                        };
+                    };
+                    case (#Ordered(data)) {
+                        switch(OrderedIndex.findInIndex(data, k)) {
+                            case null {
+                                return #ok(#Ordered(OrderedIndex.addToIndex(data, k, #Document(v)).0));
+                            };
+                            case (?_) return #err(#AlreadyExists);
+                        };
+                    };
+                };
             };
         };
 
-        public type SingleField = IndexType;  // One to Many Index
+        module SingleField = {
+            public type Type = IndexType;  // One to Many Index
+            public type Error = {};
+            public func addToIndex(idx : Type, k : Value.Value, v : Document.Value) : Resust.Result<Type, Error> {
+                switch (idx) {
+                    case (#Hash(data)) {
+                        switch(HashIndex.findInIndex(data, k)) {
+                            case null {
+                                return #ok(#Hash(HashIndex.addToIndex(data, k, #Documents(List.make(v))).0));
+                            };
+                            case (?existing) {
+                                switch(existing) {
+                                    case (#Documents(documents)) {
+                                        return #ok(#Hash(HashIndex.addToIndex(data, k, #Documents(List.push(v, documents))).0));
+                                    };
+                                    case (_) {P.unreachable()};
+                                };
+                            }
+                        };
+                    };
+                    case (#Ordered(data)) {
+                        switch(OrderedIndex.findInIndex(data, k)) {
+                            case null {
+                                return #ok(#Ordered(OrderedIndex.addToIndex(data, k, #Documents(List.make(v))).0));
+                            };
+                            case (?existing) {
+                                switch(existing) {
+                                    case (#Documents(documents)) {
+                                        return #ok(#Ordered(OrderedIndex.addToIndex(data, k, #Documents(List.push(v, documents))).0));
+                                    };
+                                    case (_) {P.unreachable()};
+                                };
+                            }
+                        };
+                    };
+                };
+            };
+        };
+
 
         //public type CompoundIndexValue = Text;
         //public type Compound    = {data : Trie.Trie<Value.Value, List.List<Document.Value>>; qualifier : [Text]};
         public type Data = {
             #Unique      : UniqueIndex.Type;
-            #SingleField : SingleField;
+            #SingleField : SingleField.Type;
             //#Compound    : Compound   ; Lets figure this out later..
         };
 
@@ -323,26 +387,32 @@ module {
             var value : Data;       // Backing Datastore of the index
             target    : Text;       // Collection Field the index is targeting
         };
-
-        public func putDocument(idx : Value, d : Document.Value) : () {
-            switch(Document.getFieldValue(d, idx.target)) {
-                case null {return};
-                case (?value) {
-
-                };
-            };
+        
+        public type Error = {
+            #UniqueIndexError : UniqueIndex.Error;
+            #SingleFieldError : SingleField.Error;
         };
 
-        func putValue(idx : Value, k : Value.Value, d : Document.Value) : Result.Result<(), ()>{
+        public func addToIndex(idx : Value, k : Value.Value, d : Document.Value) : Result.Result<Data, Error>{
             switch(idx.value) {
                 //case (#Compound(compound)) {};
-                case (#Unique(idxData)) {};
-                case (#SingleField(idxData)) {}
+                case (#Unique(idxData)) {
+                    switch(UniqueIndex.addToIndex(idxData, k, d)) {
+                        case (#ok(new)) {return #ok (#Unique(new))};
+                        case (#err(e))  {return #err(#UniqueIndexError(e))}
+                    };
+                };
+                case (#SingleField(idxData)) {
+                    switch(SingleField.addToIndex(idxData, k, d)) {
+                        case (#ok(new)) {return #ok (#Unique(new))};
+                        case (#err(e))  {return #err(#SingleFieldError(e))}
+                    };
+                }
             };
-            #ok(); // HZL TODO
+            P.unreachable();
         };
 
-        func handleSingleField(idx : Value, idxData : SingleField, k : Value.Value, d : Document.Value) : Result.Result<(), ()> {
+        func handleSingleField(idx : Value, idxData : SingleField.Type, k : Value.Value, d : Document.Value) : Result.Result<(), ()> {
             switch(idxData) {
                 case (#Hash(data)) {};
                 case (#Ordered(data)) {};
@@ -358,21 +428,82 @@ module {
             typeName          : Text                            ;  // Name of the collection. Ie "Cars"
             var structure     : Trie.Trie<Text, Value.Type>     ;  // Structure of collection Record Field Name -> ValueType
             var documents     : Trie.Trie<Nat, Document.Value>  ;  // Backing Data
-            var indicies      : List.List<CollectionIndex.Value>;  // Search Indices 
+            var indicies      : Trie.Trie<Text, List.List<CollectionIndex.Value>>;  // Search Indices 
         };
 
-        public type InsertionResult = Result.Result<Nat, {#StructureError}>;
+        public type InsertionError = {
+            #StructureError                       ;
+            #IndexError    : CollectionIndex.Error;
+        };
+
+        public type InsertionResult = Result.Result<Nat, InsertionError>;
 
         public func create(c : Collection.Value, v : [(Text, Value.Value)]) : InsertionResult {
             switch(buildDocumentForCollection(c, v)) {
                 case (#err(v)) {
                     #err(v);
                 };
-                case (#ok(v)) {
-                    c.documents := Trie.put(c.documents, {key = v.id; hash = Hash.hash(v.id)}, Nat.equal, v).0;
-                    #ok(v.id);
+                case (#ok(newDocument)) {
+                    return indexValidateAndFinalize(c, newDocument);
                 };
             }
+        };
+
+        func getIndicesForField(c : Collection.Value, f : Text) : ?List.List<CollectionIndex.Value> {
+            Trie.find(c.indicies, keyFromText(f), Text.equal);
+        };
+
+        func indexValidateAndFinalize(c : Collection.Value, d : Document.Value) : InsertionResult {
+            var updatedIndicies : Trie.Trie<Text, List.List<CollectionIndex.Value>> = Trie.empty();
+
+            for (field in Trie.iter(d.data)) {
+                switch(getIndicesForField(c, field.0)) {
+                    case null {};
+                    case (?indicies) {
+                        switch(tryAdd(field.1, d, indicies)) {
+                            case (#ok(updated)) {
+                                updatedIndicies := Trie.put(updatedIndicies, keyFromText(field.0), Text.equal, updated).0;
+                            };
+                            case (#err(e)) {
+                                return #err(#IndexError(e));
+                            };
+                        };
+                    };
+                };
+            };
+
+            // Finalize
+            c.documents := Trie.put(c.documents, {key = d.id; hash = Hash.hash(d.id)}, Nat.equal, d).0;
+            c.indicies  := updatedIndicies;
+            #ok(d.id);
+        };
+
+        func tryAdd(v : Value.Value, d : Document.Value, idxs : List.List<CollectionIndex.Value>) : Result.Result<List.List<CollectionIndex.Value>, CollectionIndex.Error> {
+            var this : List.List<CollectionIndex.Value> = idxs;
+            var out  : List.List<CollectionIndex.Value> = List.nil();
+
+            while (Option.isSome(this)) {
+                ignore do ? {
+                    let idx = this!.0;
+                    switch(CollectionIndex.addToIndex(idx, v, d)) {
+                        case (#ok(result)) {
+                            // HZL TODO - we're generating a silly amount of Garbage with each index.. 
+                            // Might consider creating an IndexResultDelta Object 
+                            out := List.push<CollectionIndex.Value>({
+                                name      = idx.name;
+                                target    = idx.target;
+                                var value = result;
+                            }, out);
+                        };
+                        case (#err(e)) {
+                            return #err(e);
+                        };
+                    };
+                };
+
+                this := List.pop<CollectionIndex.Value>(this).1;
+            };
+            return #ok(out);
         };
 
         public func getById(c : Collection.Value, id : Nat) : ?Document.PublicValue {
