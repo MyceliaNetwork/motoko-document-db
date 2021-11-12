@@ -1,5 +1,6 @@
 import Blob "mo:base/Blob";
 import Collection "mo:base/Array";
+import Debug "mo:base/Debug";
 import Document "mo:base/Array";
 import ExperimentalStorage "mo:base/ExperimentalStableMemory";
 import Float "mo:base/Float";
@@ -22,7 +23,7 @@ import Trie "mo:base/Trie";
 import Value "mo:base/Array";
 
 module {
-    module Value = {
+    public module Value = {
             public type Value = {
                 #Nat       : Nat64                 ;
                 #Int       : Int64                 ;
@@ -30,7 +31,7 @@ module {
                 #Text      : Text                  ;
                 #Blob      : Blob                  ;
                 #Principal : Principal             ;
-                #Document  : Document.Value        ; // HZL TODO : Do we really want to support nested documents? Or, should this be a refence type. {#Local : Document.Value; #Remote ...}
+                //#Document  : Document.Value        ; // HZL TODO : Do we really want to support nested documents? Or, should this be a refence type. {#Local : Document.Value; #Remote ...}
                 #Optional  : {v : ?Value; t : Type}; 
             };
 
@@ -41,7 +42,7 @@ module {
                 #Text                              ;
                 #Blob                              ;
                 #Principal                         ;
-                #Document   : Document.Type        ;
+                //#Document   : Document.Type        ;
                 #Optional   : Type                 ;
             };
 
@@ -53,7 +54,7 @@ module {
                     case (#Text(v)) {Text.hash v};
                     case (#Principal(v)) {Principal.hash v};
                     case (#Blob(v)) {Blob.hash v};
-                    case (#Document(v)) {Document.hash(v)};
+                    //case (#Document(v)) {Document.hash(v)};
                     case (#Optional(v)) {
                         switch(v.v) {
                             case null return 0;
@@ -85,9 +86,9 @@ module {
                     case (#Blob(v)) {
                         return Blob.compare(v, Unwrap.blob(r));
                     };
-                    case (#Document(v)) {
-                        return Nat.compare(v.id, Unwrap.document(r).id);
-                    };
+                    // case (#Document(v)) {
+                    //     return Nat.compare(v.id, Unwrap.document(r).id);
+                    // };
                     case (#Optional(v)) {
                         let rR = Unwrap.optional(r);
                         switch(v.v) {
@@ -139,10 +140,10 @@ module {
                     Blob.fromArray([]);
                 };
 
-                public func document(v0 : Value) : Document.Value {
-                    switch(v0) { case (#Document(v)) return v; case _ {assert false}};
-                    P.unreachable();
-                };
+                // public func document(v0 : Value) : Document.Value {
+                //     switch(v0) { case (#Document(v)) return v; case _ {assert false}};
+                //     P.unreachable();
+                // };
 
                 public func optional(v0 : Value) :?Value.Value {
                     switch(v0) { case (#Optional(v)) return v.v; case _ {assert false}};
@@ -164,7 +165,7 @@ module {
                     case (#Int(_))       {#Int};
                     case (#Text(_))      {#Text};
                     case (#Principal(_)) {#Principal};
-                    case (#Document(v))  {#Document(v.docType)};
+                    //case (#Document(v))  {#Document(v.docType)};
                     case (#Blob(_))      {#Blob};
                     case (#Float(_))     {#Float};
                     case (#Optional(v))  {#Optional(v.t)};
@@ -177,7 +178,7 @@ module {
                     case (#Int(_))       {1};
                     case (#Text(_))      {2};
                     case (#Principal(_)) {3};
-                    case (#Document(v))  {4};
+                    //case (#Document(v))  {4};
                     case (#Blob(_))      {5};
                     case (#Optional(v))  {return 1000 + typeHash(v) + 1;};
                     case (#Float(_))         {100}
@@ -189,7 +190,7 @@ module {
             };
     };
     
-    module Document {
+    public module Document {
         public type Type       = Collection.Value;
         public type Value      = {
             id            : Nat                          ;
@@ -253,7 +254,7 @@ module {
         //public func insertField(f : Field, v : Value.Type)
     };
 
-    module CollectionIndex = {
+    public module CollectionIndex = {
         public type Type = {
             #Unique     ;
             #SingleField;
@@ -397,14 +398,16 @@ module {
             switch(idx.value) {
                 //case (#Compound(compound)) {};
                 case (#Unique(idxData)) {
+                    //Debug.print("Adding to Unique Index");
                     switch(UniqueIndex.addToIndex(idxData, k, d)) {
                         case (#ok(new)) {return #ok (#Unique(new))};
                         case (#err(e))  {return #err(#UniqueIndexError(e))}
                     };
                 };
                 case (#SingleField(idxData)) {
+                    //Debug.print("Adding to SingleField Index");
                     switch(SingleField.addToIndex(idxData, k, d)) {
-                        case (#ok(new)) {return #ok (#Unique(new))};
+                        case (#ok(new)) {return #ok (#SingleField(new))};
                         case (#err(e))  {return #err(#SingleFieldError(e))}
                     };
                 }
@@ -421,8 +424,13 @@ module {
         };
     };
 
-    module Collection {
+    public module Collection {
         public type Type  = {#Collection};
+
+        public type Structure = Trie.Trie<Text, Value.Type>;
+        public type Documents = Trie.Trie<Nat, Document.Value>;
+        public type Indices   = Trie.Trie<Text, List.List<CollectionIndex.Value>>;
+
         public type Value = {
             var autoId        : Nat                             ;  // Next id for a document on create
             typeName          : Text                            ;  // Name of the collection. Ie "Cars"
@@ -475,6 +483,7 @@ module {
             // Finalize
             c.documents := Trie.put(c.documents, {key = d.id; hash = Hash.hash(d.id)}, Nat.equal, d).0;
             c.indicies  := updatedIndicies;
+            c.autoId    += 1;
             #ok(d.id);
         };
 

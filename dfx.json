@@ -3,19 +3,6 @@
     "database": {
       "main": "src/database/main.mo",
       "type": "motoko"
-    },
-    "database_assets": {
-      "dependencies": [
-        "database"
-      ],
-      "frontend": {
-        "entrypoint": "src/database_assets/src/index.html"
-      },
-      "source": [
-        "src/database_assets/assets",
-        "dist/database_assets/"
-      ],
-      "type": "assets"
     }
   },
   "defaults": {
