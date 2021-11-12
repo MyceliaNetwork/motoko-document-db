@@ -1,4 +1,9 @@
 import Database "database";
+import Value "value";
+import Collection "collection";
+import Document "document";
+import CollectionIndex "collectionIndex";
+
 import Debug "mo:base/Debug";
 import Hash "mo:base/Hash";
 import Iter "mo:base/Iter";
@@ -13,27 +18,27 @@ actor {
         return {key = v; hash = Text.hash(v)};
     };
 
-    let test : Database.Collection.Value = do {
-        let v : Database.Collection.Value = {
+    let test : Collection.Value = do {
+        let v : Collection.Value = {
             typeName      = "Test";
             var autoId    = 0;
-            var documents : Database.Collection.Documents = Trie.empty();
-            var structure : Database.Collection.Structure = Trie.empty();
-            var indicies  : Database.Collection.Indices   = Trie.empty();
+            var documents : Collection.Documents = Trie.empty();
+            var structure : Collection.Structure = Trie.empty();
+            var indicies  : Collection.Indices   = Trie.empty();
         };
 
-        v.structure := Trie.put<Text, Database.Value.Type>(v.structure, keyOf("amount"), Text.equal, #Nat).0;
-        v.structure := Trie.put<Text, Database.Value.Type>(v.structure, keyOf("name"),   Text.equal, #Text).0;
+        v.structure := Trie.put<Text, Value.Type>(v.structure, keyOf("amount"), Text.equal, #Nat).0;
+        v.structure := Trie.put<Text, Value.Type>(v.structure, keyOf("name"),   Text.equal, #Text).0;
 
-        var i : List.List<Database.CollectionIndex.Value> = List.nil();
+        var i : List.List<CollectionIndex.Value> = List.nil();
 
-        i := List.push<Database.CollectionIndex.Value>({
+        i := List.push<CollectionIndex.Value>({
             name = "Test index";
             target = "amount";
             var value = #SingleField(#Hash(Trie.empty()));
         }, i);
 
-        i := List.push<Database.CollectionIndex.Value>({
+        i := List.push<CollectionIndex.Value>({
             name = "Foo index";
             target = "name";
             var value = #SingleField(#Hash(Trie.empty()));
@@ -43,7 +48,7 @@ actor {
         v;
     };
 
-    public type P = Database.Document.PublicValue;
+    public type P = Document.PublicValue;
 
     public query func readAll() : async Trie.Trie<Nat, P> {
         var out = Trie.empty<Nat, P>();
@@ -61,7 +66,7 @@ actor {
 
     public func put(times : Nat) : async () {
         for (x in Iter.range(0, times)) {
-            switch(Database.Collection.create(test, [
+            switch(Collection.create(test, [
                 ("amount", #Nat(Nat64.fromNat(x))),
                 ("name", #Text("Lol its record " # Nat.toText(x))),
             ])) {
@@ -71,7 +76,7 @@ actor {
         };
     };
 
-    public query func read(id : Nat) : async ?Database.Document.PublicValue {
-        Database.Collection.getById(test, id);
+    public query func read(id : Nat) : async ?Document.PublicValue {
+        Collection.getById(test, id);
     };
 };
