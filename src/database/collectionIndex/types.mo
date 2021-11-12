@@ -11,6 +11,61 @@ module Types {
         //#Compound   ;
     };
 
+    public module Egg {
+        public type Value = {
+            #Unique      : {indexType : IndexStoreType; data : IndexData};
+            #SingleField : {indexType : IndexStoreType; data : IndexData};
+        };
+
+        public type IndexStoreType = {
+            #HashIndex    : IndexData; 
+            #OrderedIndex : IndexData;
+        };
+
+        public type IndexData = {
+            name        : Text;
+            target      : Text;
+        };
+
+        public func indexFromEgg(e : Egg.Value) : Types.Value {
+            switch(e) {
+                case (#Unique(d)) {
+                    return {
+                        name = d.data.name;
+                        target = d.data.target;
+                        var value = #Unique(getStoreType(d.indexType));
+                    }
+                };
+                case (#SingleField(d)) {
+                    return {
+                        name = d.data.name;
+                        target = d.data.target;
+                        var value = #SingleField(getStoreType(d.indexType));
+                    };
+                };
+            };
+        };
+
+        func getStoreType(v : IndexStoreType) : IndexType {
+            switch(v) {
+                case (#HashIndex(_)) {
+                    return #Hash(getEmptyHashStore());
+                };
+                case (#OrderedIndex(_)) {
+                    return #Ordered(getEmptyOrderedStore());
+                };
+            }
+        };
+
+        func getEmptyHashStore() : HashIndex.Type {
+            return Trie.empty();
+        };
+
+        func getEmptyOrderedStore() : OrderedIndex.Type {
+            return RBTree.empty();
+        };
+    };
+
     public type Value = {
         name      : Text;       // Reference name of the index
         //typeName  : Type;       // Type of the index. Ie : Unique

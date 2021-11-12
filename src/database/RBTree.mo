@@ -28,6 +28,10 @@ module {
     getRec(x, comp, t);
   };
 
+  public func empty<X, Y>() : Tree<X, Y> {
+    return (#leaf : Tree<X, Y>);
+  };
+
   /// Put an entry: A value associated with a given key.
   public func put<X, Y>(t : Tree<X, Y>, comp : Compare<X>, x : X, y : Y) : (?Y, Tree<X, Y>) {
     insertRoot(x, comp, y, t);
