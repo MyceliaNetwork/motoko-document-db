@@ -14,25 +14,27 @@ import Optiona "mo:base/Option";
 import Order "mo:base/Order";
 import P "mo:base/Prelude";
 import Principal "mo:base/Principal";
-import RBTree "RBTree";
+import RBTree "../RBTree";
 import Result "mo:base/Result";
 import Resust "mo:base/Result";
-import Shared "shared";
 import Text "mo:base/Text";
 import Trie "mo:base/Trie";
-import Value "value";
+import Values "../values";
+
+import DocumentTypes "../document/types";
+import CollectionIndexTypes "../collectionIndex/types";
 
 module CollectionIndex = {
-    public type Type = Shared.CollectionIndex.Type;
+    public type Type = CollectionIndex.Type;
 
-    type Document  = Shared.Document.Value           ;
-    type Documents = List.List<Shared.Document.Value>; // HZL This isn't ideal. Should use a TrieSet.
+    type Document  = DocumentTypes.Value           ;
+    type Documents = List.List<DocumentTypes.Value>; // HZL This isn't ideal. Should use a TrieSet.
 
-    public type IndexValue = Shared.CollectionIndex.IndexValue;
+    public type IndexValue = CollectionIndexTypes.IndexValue;
     
     // Index Value Store Types
     module HashIndex = {
-        public type Type = Shared.CollectionIndex.HashIndex.Type;
+        public type Type = CollectionIndexTypes.HashIndex.Type;
 
         // Add a key to the index. Overwriting the existing value
         public func addToIndex(idx : Type, k : Value.Value, v : IndexValue) : (Type, ?IndexValue) {
@@ -48,7 +50,7 @@ module CollectionIndex = {
     };
 
     module OrderedIndex = {
-        public type Type = Shared.CollectionIndex.OrderedIndex.Type;
+        public type Type = CollectionIndexTypes.OrderedIndex.Type;
 
         // Add a key to the index. Overwriting the existing value
         public func addToIndex(idx : Type, k : Value.Value, v : IndexValue) : (Type, ?IndexValue) {
@@ -62,11 +64,11 @@ module CollectionIndex = {
     };
 
     // Index Types
-    public type IndexType = Shared.CollectionIndex.IndexType;
+    public type IndexType = CollectionIndexTypes.IndexType;
     
     module UniqueIndex = {
         public type Type = IndexType;  // One to One Index
-        public type Error = Shared.CollectionIndex.UniqueIndex.Error;
+        public type Error = CollectionIndexTypes.UniqueIndex.Error;
 
         public func addToIndex(idx : Type, k : Value.Value, v : Shared.Document.Value) : Resust.Result<Type, Error> {
             switch(idx) {
@@ -92,7 +94,7 @@ module CollectionIndex = {
 
     module SingleField = {
         public type Type = IndexType;  // One to Many Index
-        public type Error = Shared.CollectionIndex.SingleField.Error;
+        public type Error = CollectionIndexTypes.SingleField.Error;
 
         public func addToIndex(idx : Type, k : Value.Value, v : Shared.Document.Value) : Resust.Result<Type, Error> {
             switch (idx) {
@@ -139,7 +141,7 @@ module CollectionIndex = {
         //#Compound    : Compound   ; Lets figure this out later..
     };
 
-    public type Value = Shared.CollectionIndex.Value;
+    public type Value = CollectionIndexTypes.Value;
     
     public type Error = {
         #UniqueIndexError : UniqueIndex.Error;

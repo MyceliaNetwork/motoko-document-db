@@ -1,4 +1,4 @@
-import H "helpers";
+import H "../helpers";
 import Hash "mo:base/Hash";
 import List "mo:base/List";
 import Nat "mo:base/Nat";
@@ -6,28 +6,28 @@ import Option "mo:base/Option";
 import Result "mo:base/Result";
 import Text "mo:base/Text";
 import Trie "mo:base/Trie";
-import Value "value";
-import CollectionIndex "collectionIndex";
+import Values "../values";
 
-import Shared "shared";
+import CollectionIndex "../collectionIndex";
+import Types "types";
 
 module Collection {
-    public type Type  = Shared.Collection.Type;
+    public type Type  = Types.Type;
 
-    public type Structure = Trie.Trie<Text, Value.Type>;
-    public type Documents = Trie.Trie<Nat, Shared.Document.Value>;
-    public type Indices   = Trie.Trie<Text, List.List<Shared.CollectionIndex.Value>>;
+    public type Structure = Trie.Trie<Text, Values.Type>;
+    public type Documents = Trie.Trie<Nat, Types.Value>;
+    public type Indices   = Trie.Trie<Text, List.List<CollectionIndex.Value>>;
 
-    public type Value     = Shared.Collection.Value;
+    public type Value     = Types.Value;
 
     public type InsertionError = {
         #StructureError                              ;
-        #IndexError    : Shared.CollectionIndex.Error;
+        #IndexError    : CollectionIndex.Error       ;
     };
 
     public type InsertionResult = Result.Result<Nat, InsertionError>;
 
-    public func create(c : Collection.Value, v : [(Text, Value.Value)]) : InsertionResult {
+    public func create(c : Collection.Value, v : [(Text, Values.Value)]) : InsertionResult {
         switch(buildDocumentForCollection(c, v)) {
             case (#err(v)) {
                 #err(v);
@@ -38,12 +38,12 @@ module Collection {
         }
     };
 
-    func getIndicesForField(c : Collection.Value, f : Text) : ?List.List<Shared.CollectionIndex.Value> {
+    func getIndicesForField(c : Collection.Value, f : Text) : ?List.List<CollectionIndex.Value> {
         Trie.find(c.indicies, H.keyFromText(f), Text.equal);
     };
 
-    func indexValidateAndFinalize(c : Collection.Value, d : Shared.Document.Value) : InsertionResult {
-        var updatedIndicies : Trie.Trie<Text, List.List<Shared.CollectionIndex.Value>> = Trie.empty();
+    func indexValidateAndFinalize(c : Collection.Value, d : Document.Value) : InsertionResult {
+        var updatedIndicies : Trie.Trie<Text, List.List<CollectionIndex.Value>> = Trie.empty();
 
         for (field in Trie.iter(d.data)) {
             switch(getIndicesForField(c, field.0)) {
@@ -68,9 +68,9 @@ module Collection {
         #ok(d.id);
     };
 
-    func tryAdd(v : Value.Value, d : Shared.Document.Value, idxs : List.List<Shared.CollectionIndex.Value>) : Result.Result<List.List<Shared.CollectionIndex.Value>, Shared.CollectionIndex.Error> {
-        var this : List.List<Shared.CollectionIndex.Value> = idxs;
-        var out  : List.List<Shared.CollectionIndex.Value> = List.nil();
+    func tryAdd(v : Value.Value, d : Document.Value, idxs : List.List<CollectionIndex.Value>) : Result.Result<List.List<CollectionIndex.Value>, CollectionIndex.Error> {
+        var this : List.List<CollectionIndex.Value> = idxs;
+        var out  : List.List<CollectionIndex.Value> = List.nil();
 
         while (Option.isSome(this)) {
             ignore do ? {
@@ -91,28 +91,38 @@ module Collection {
                 };
             };
 
-            this := List.pop<Shared.CollectionIndex.Value>(this).1;
+            this := List.pop<CollectionIndex.Value>(this).1;
         };
         return #ok(out);
     };
 
-    public func getById(c : Collection.Value, id : Nat) : ?Shared.Document.PublicValue {
+    public func getById(c : Collection.Value, id : Nat) : ?Document.PublicValue {
         switch(Trie.find(c.documents, {key = id; hash = Hash.hash(id)}, Nat.equal)) {
             case null return null;
-            case (?v) return ?Shared.Document.toPublic(v);
+            case (?v) return ?Document.toPublic(v);
         };
     };
 
-    public func typeOfField(c : Collection.Value, f : Text) : ?Value.Type {
+    public func typeOfField(c : Collection.Value, f : Text) : ?Values.Type {
         Trie.find(c.structure, H.keyFromText(f), Text.equal)
     };
 
-    func buildDocumentForCollection(c : Collection.Value, v : [(Text, Value.Value)]) : Result.Result<Shared.Document.Value, {#StructureError}> {
-        var values : Trie.Trie<Text, Value.Value> = Trie.empty();
+    func buildDocumentForCollection(c : Collection.Value, v : [(Text, Values.Value)]) : Result.Result<Document.Value, {#StructureError}> {
+        var values : Trie.Trie<Text, Values.Value> = Trie.empty();
         var entryCount    = 0;
         var structureSize = Trie.size(c.structure);
-
+    
         for (value in v.vals()) {
+            // Validate document structure
+            switch(typeOfField(c, value.0)) {
+                case null return #err(#StructureError);
+                case (?fieldType) {
+                    if (not (Value.sameType(fieldType, Value.typeOf(value.1)))) {
+                        return #err(#StructureError);
+                    };
+                };
+            };
+
             values := Trie.put(values, H.keyFromText(value.0), Text.equal, value.1).0;
             entryCount += 1;
             if (entryCount > structureSize) {

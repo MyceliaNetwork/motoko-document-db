@@ -14,25 +14,15 @@ import Optiona "mo:base/Option";
 import Order "mo:base/Order";
 import P "mo:base/Prelude";
 import Principal "mo:base/Principal";
-import RBTree "RBTree";
+import RBTree "../RBTree";
 import Result "mo:base/Result";
 import Resust "mo:base/Result";
 import Text "mo:base/Text";
 import Trie "mo:base/Trie";
 
-import Value "value";
-import Document "document";
-import Shared "shared";
-
+import Types "types";
 
 module {
-    public type Type  = {#Database};
-        public type Value = {
-            name        : Text;
-            collections : Trie.Trie<Text, Shared.Collection.Value>;
-    };
-
-    func keyFromText(v : Text) : Trie.Key<Text> {
-            return {key = v; hash = Text.hash(v)};
-    };
+    public type Type  = Types.Type;
+    public type Value = Types.Value;
 }

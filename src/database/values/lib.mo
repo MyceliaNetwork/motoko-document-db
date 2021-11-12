@@ -11,30 +11,10 @@ import Text "mo:base/Text";
 import Option "mo:base/Option";
 import P "mo:base/Prelude";
 
-module Value = {
-    public type Value = {
-        #Nat       : Nat64                 ;
-        #Int       : Int64                 ;
-        #Float     : Float                 ;
-        #Text      : Text                  ;
-        #Blob      : Blob                  ;
-        #Principal : Principal             ;
-        //#Document  : Document.Value        ; // HZL TODO : Do we really want to support nested documents? Or, should this be a refence type. {#Local : Document.Value; #Remote ...}
-        #Optional  : {v : ?Value; t : Type}; 
-    };
+import Types "types";
 
-    public type Type = {
-        #Nat                               ;
-        #Int                               ;
-        #Float                             ;
-        #Text                              ;
-        #Blob                              ;
-        #Principal                         ;
-        //#Document   : Document.Type        ;
-        #Optional   : Type                 ;
-    };
-
-    public func hash(v : Value.Value) : Hash.Hash {
+module Values = {
+    public func hash(v : Types.Value) : Hash.Hash {
         switch(v) {
             case (#Nat(v)) {Hash.hash(Nat64.toNat(v))};
             case (#Int(v)) {Int.hash(Int64.toInt(v))};
@@ -52,7 +32,7 @@ module Value = {
         };
     };
 
-    public func compare(l : Value.Value, r : Value.Value) : Order.Order {
+    public func compare(l : Types.Value, r : Types.Value) : Order.Order {
         assert sameType(typeOf(l), typeOf(r));
 
         switch(l) {
@@ -98,32 +78,32 @@ module Value = {
     };
     
     module Unwrap {
-        public func nat(v0 : Value) : Nat64 {
+        public func nat(v0 : Types.Value) : Nat64 {
             switch(v0) { case (#Nat(v)) return v; case _ {assert false}};
             P.unreachable();
         };
 
-        public func int(v0 : Value) : Int64 {
+        public func int(v0 : Types.Value) : Int64 {
             switch(v0) { case (#Int(v)) return v; case _ {assert false}};
             P.unreachable();
         };
 
-        public func float(v0 : Value) : Float {
+        public func float(v0 : Types.Value) : Float {
             switch(v0) { case (#Float(v)) return v; case _ {assert false}};
             P.unreachable();
         };
 
-        public func text(v0 : Value) : Text {
+        public func text(v0 : Types.Value) : Text {
             switch(v0) { case (#Text(v)) return v; case _ {assert false}};
             P.unreachable();
         };
 
-        public func principal(v0 : Value) : Principal {
+        public func principal(v0 : Types.Value) : Principal {
             switch(v0) { case (#Principal(v)) return v; case _ {assert false}};
             P.unreachable();
         };
 
-        public func blob(v0 : Value) : Blob {
+        public func blob(v0 : Types.Value) : Blob {
             switch(v0) { case (#Blob(v)) return v; case _ {assert false}};
             Blob.fromArray([]);
         };
@@ -133,21 +113,21 @@ module Value = {
         //     P.unreachable();
         // };
 
-        public func optional(v0 : Value) :?Value.Value {
+        public func optional(v0 : Types.Value) :?Types.Value {
             switch(v0) { case (#Optional(v)) return v.v; case _ {assert false}};
             P.unreachable();
         };
     };
 
-    public func key(v : Value) : Trie.Key<Value> {
+    public func key(v : Types.Value) : Trie.Key<Types.Value> {
         {key = v; hash = hash(v)};
     };
 
-    public func equal(l : Value, r : Value) : Bool {
+    public func equal(l : Types.Value, r : Types.Value) : Bool {
         return hash(l) == hash(r) and typeHash(typeOf(l)) == typeHash(typeOf(r));
     };
 
-    public func typeOf(v : Value) : Type {
+    public func typeOf(v : Types.Value) : Types.Type {
         switch(v) {
             case (#Nat(_))       {#Nat};
             case (#Int(_))       {#Int};
@@ -160,7 +140,7 @@ module Value = {
         };
     };
 
-    public func typeHash(v : Type) : Hash.Hash {
+    public func typeHash(v : Types.Type) : Hash.Hash {
         switch (v) {
             case (#Nat(_))       {0};
             case (#Int(_))       {1};
@@ -173,7 +153,7 @@ module Value = {
         };
     };
 
-    public func sameType(l : Value.Type, r : Value.Type) : Bool {
+    public func sameType(l : Types.Type, r : Types.Type) : Bool {
         return typeHash(l) == typeHash(r);
     };
 };
