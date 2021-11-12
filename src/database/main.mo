@@ -23,11 +23,19 @@ actor {
         };
 
         v.structure := Trie.put<Text, Database.Value.Type>(v.structure, keyOf("amount"), Text.equal, #Nat).0;
+        v.structure := Trie.put<Text, Database.Value.Type>(v.structure, keyOf("name"),   Text.equal, #Text).0;
 
         var i : List.List<Database.CollectionIndex.Value> = List.nil();
+
         i := List.push<Database.CollectionIndex.Value>({
             name = "Test index";
             target = "amount";
+            var value = #SingleField(#Hash(Trie.empty()));
+        }, i);
+
+        i := List.push<Database.CollectionIndex.Value>({
+            name = "Foo index";
+            target = "name";
             var value = #SingleField(#Hash(Trie.empty()));
         }, i);
 
@@ -53,7 +61,13 @@ actor {
 
     public func put(times : Nat) : async () {
         for (x in Iter.range(0, times)) {
-            Debug.print(debug_show Database.Collection.create(test, [("amount", #Nat(Nat64.fromNat(x)))]));
+            switch(Database.Collection.create(test, [
+                ("amount", #Nat(Nat64.fromNat(x))),
+                ("name", #Text("Lol its record " # Nat.toText(x))),
+            ])) {
+                case (#ok(_)) {};
+                case (#err(e)) {Debug.print(debug_show e)};
+            };
         };
     };
 
