@@ -21,56 +21,55 @@ import Text "mo:base/Text";
 import Trie "mo:base/Trie";
 import Values "../values";
 
-import DocumentTypes "../document/types";
-import CollectionIndexTypes "../collectionIndex/types";
+import Documents "../document/types";
+import Types "types";
 
 module CollectionIndex = {
-    public type Type = CollectionIndex.Type;
+    public type Value     = Types.Value;
+    public type Document  = Documents.Value           ;
+    public type Documents = List.List<Documents.Value>; // HZL This isn't ideal. Should use a TrieSet.
 
-    type Document  = DocumentTypes.Value           ;
-    type Documents = List.List<DocumentTypes.Value>; // HZL This isn't ideal. Should use a TrieSet.
-
-    public type IndexValue = CollectionIndexTypes.IndexValue;
+    public type IndexValue = Types.IndexValue;
     
     // Index Value Store Types
     module HashIndex = {
-        public type Type = CollectionIndexTypes.HashIndex.Type;
+        public type Type = Types.HashIndex.Type;
 
         // Add a key to the index. Overwriting the existing value
-        public func addToIndex(idx : Type, k : Value.Value, v : IndexValue) : (Type, ?IndexValue) {
-            let key = Value.key(k);
-            return Trie.put<Value.Value, IndexValue>(idx, key, Value.equal, v);
+        public func addToIndex(idx : Type, k : Values.Value, v : IndexValue) : (Type, ?IndexValue) {
+            let key = Values.key(k);
+            return Trie.put<Values.Value, IndexValue>(idx, key, Values.equal, v);
         };
 
         // Find a value in the index
-        public func findInIndex(idx : Type, k : Value.Value) : ?IndexValue {
-            let key = Value.key(k);
-            return Trie.find(idx, key, Value.equal);
+        public func findInIndex(idx : Type, k : Values.Value) : ?IndexValue {
+            let key = Values.key(k);
+            return Trie.find(idx, key, Values.equal);
         };
     };
 
     module OrderedIndex = {
-        public type Type = CollectionIndexTypes.OrderedIndex.Type;
+        public type Type = Types.OrderedIndex.Type;
 
         // Add a key to the index. Overwriting the existing value
-        public func addToIndex(idx : Type, k : Value.Value, v : IndexValue) : (Type, ?IndexValue) {
-            let (a, b) = RBTree.put<Value.Value, IndexValue>(idx, Value.compare, k, v);
+        public func addToIndex(idx : Type, k : Values.Value, v : IndexValue) : (Type, ?IndexValue) {
+            let (a, b) = RBTree.put<Values.Value, IndexValue>(idx, Values.compare, k, v);
             return (b, a);
         };
         
-        public func findInIndex(idx : Type, k : Value.Value) : ?IndexValue {
-            RBTree.get(idx, Value.compare, k);
+        public func findInIndex(idx : Type, k : Values.Value) : ?IndexValue {
+            RBTree.get(idx, Values.compare, k);
         };
     };
 
     // Index Types
-    public type IndexType = CollectionIndexTypes.IndexType;
+    public type IndexType = Types.IndexType;
     
     module UniqueIndex = {
         public type Type = IndexType;  // One to One Index
-        public type Error = CollectionIndexTypes.UniqueIndex.Error;
+        public type Error = Types.UniqueIndex.Error;
 
-        public func addToIndex(idx : Type, k : Value.Value, v : Shared.Document.Value) : Resust.Result<Type, Error> {
+        public func addToIndex(idx : Type, k : Values.Value, v : Documents.Value) : Resust.Result<Type, Error> {
             switch(idx) {
                 case (#Hash(data)) {
                     switch(HashIndex.findInIndex(data, k)) {
@@ -94,9 +93,9 @@ module CollectionIndex = {
 
     module SingleField = {
         public type Type = IndexType;  // One to Many Index
-        public type Error = CollectionIndexTypes.SingleField.Error;
+        public type Error = Types.SingleField.Error;
 
-        public func addToIndex(idx : Type, k : Value.Value, v : Shared.Document.Value) : Resust.Result<Type, Error> {
+        public func addToIndex(idx : Type, k : Values.Value, v : Documents.Value) : Resust.Result<Type, Error> {
             switch (idx) {
                 case (#Hash(data)) {
                     switch(HashIndex.findInIndex(data, k)) {
@@ -140,15 +139,13 @@ module CollectionIndex = {
         #SingleField : SingleField.Type;
         //#Compound    : Compound   ; Lets figure this out later..
     };
-
-    public type Value = CollectionIndexTypes.Value;
     
     public type Error = {
         #UniqueIndexError : UniqueIndex.Error;
         #SingleFieldError : SingleField.Error;
     };
 
-    public func addToIndex(idx : Value, k : Value.Value, d : Shared.Document.Value) : Result.Result<Data, Error>{
+    public func addToIndex(idx : Value, k : Values.Value, d : Documents.Value) : Result.Result<Data, Error>{
         switch(idx.value) {
             //case (#Compound(compound)) {};
             case (#Unique(idxData)) {
@@ -169,7 +166,7 @@ module CollectionIndex = {
         P.unreachable();
     };
 
-    func handleSingleField(idx : Value, idxData : SingleField.Type, k : Value.Value, d : Shared.Document.Value) : Result.Result<(), ()> {
+    func handleSingleField(idx : Value, idxData : SingleField.Type, k : Values.Value, d : Documents.Value) : Result.Result<(), ()> {
         switch(idxData) {
             case (#Hash(data)) {};
             case (#Ordered(data)) {};

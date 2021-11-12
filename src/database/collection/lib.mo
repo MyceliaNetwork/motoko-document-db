@@ -6,23 +6,35 @@ import Option "mo:base/Option";
 import Result "mo:base/Result";
 import Text "mo:base/Text";
 import Trie "mo:base/Trie";
-import Values "../values";
 
 import CollectionIndex "../collectionIndex";
+
+import Document "../document/types";
+import Values "../values/";
+
 import Types "types";
 
 module Collection {
-    public type Type  = Types.Type;
-
-    public type Structure = Trie.Trie<Text, Values.Type>;
-    public type Documents = Trie.Trie<Nat, Types.Value>;
-    public type Indices   = Trie.Trie<Text, List.List<CollectionIndex.Value>>;
-
+    public type Type      = Types.Type;
     public type Value     = Types.Value;
+    public type Structure = Types.Structure;
+    public type Documents = Types.Documents;
+    public type Indices   = Types.Indices;
 
     public type InsertionError = {
         #StructureError                              ;
         #IndexError    : CollectionIndex.Error       ;
+    };
+
+
+    public func getEmptyCollection(name : Text) : Types.Value {
+        return  {
+            typeName   = name;
+            var autoId = 0;
+            var documents : Documents = Trie.empty();
+            var indicies  : Indices   = Trie.empty();
+            var structure : Structure = Trie.empty();
+        }
     };
 
     public type InsertionResult = Result.Result<Nat, InsertionError>;
@@ -68,7 +80,7 @@ module Collection {
         #ok(d.id);
     };
 
-    func tryAdd(v : Value.Value, d : Document.Value, idxs : List.List<CollectionIndex.Value>) : Result.Result<List.List<CollectionIndex.Value>, CollectionIndex.Error> {
+    func tryAdd(v : Values.Value, d : Document.Value, idxs : List.List<CollectionIndex.Value>) : Result.Result<List.List<CollectionIndex.Value>, CollectionIndex.Error> {
         var this : List.List<CollectionIndex.Value> = idxs;
         var out  : List.List<CollectionIndex.Value> = List.nil();
 
@@ -117,7 +129,7 @@ module Collection {
             switch(typeOfField(c, value.0)) {
                 case null return #err(#StructureError);
                 case (?fieldType) {
-                    if (not (Value.sameType(fieldType, Value.typeOf(value.1)))) {
+                    if (not (Values.sameType(fieldType, Values.typeOf(value.1)))) {
                         return #err(#StructureError);
                     };
                 };

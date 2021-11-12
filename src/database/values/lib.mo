@@ -14,6 +14,9 @@ import P "mo:base/Prelude";
 import Types "types";
 
 module Values = {
+    public type Type  = Types.Type;
+    public type Value = Types.Value;
+
     public func hash(v : Types.Value) : Hash.Hash {
         switch(v) {
             case (#Nat(v)) {Hash.hash(Nat64.toNat(v))};
