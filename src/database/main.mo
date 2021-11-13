@@ -1,7 +1,7 @@
 import Collection "collection";
 import CollectionIndex "collectionIndex";
 import Document "document";
-
+import Query "query";
 import Values "values";
 
 import Debug "mo:base/Debug";
@@ -23,7 +23,7 @@ actor {
         
         v.structure := Trie.put<Text, Values.Type>(v.structure, keyOf("amount"), Text.equal, #Nat).0;
         v.structure := Trie.put<Text, Values.Type>(v.structure, keyOf("name"),   Text.equal, #Text).0;
-
+        
         var i : List.List<CollectionIndex.Value> = List.nil();
 
         i := List.push<CollectionIndex.Value>({

@@ -1,3 +1,5 @@
+import CollectionIndex "../collectionIndex";
+import Document "../document/types";
 import H "../helpers";
 import Hash "mo:base/Hash";
 import List "mo:base/List";
@@ -6,13 +8,8 @@ import Option "mo:base/Option";
 import Result "mo:base/Result";
 import Text "mo:base/Text";
 import Trie "mo:base/Trie";
-
-import CollectionIndex "../collectionIndex";
-
-import Document "../document/types";
-import Values "../values/";
-
 import Types "types";
+import Values "../values/";
 
 module Collection {
     public type Type      = Types.Type;
@@ -20,6 +17,8 @@ module Collection {
     public type Structure = Types.Structure;
     public type Documents = Types.Documents;
     public type Indices   = Types.Indices;
+
+    public type PublicValue = Document.PublicValue;
 
     public type InsertionError = {
         #StructureError                              ;
@@ -50,7 +49,7 @@ module Collection {
         }
     };
 
-    func getIndicesForField(c : Collection.Value, f : Text) : ?List.List<CollectionIndex.Value> {
+    public func getIndicesForField(c : Collection.Value, f : Text) : ?List.List<CollectionIndex.Value> {
         Trie.find(c.indicies, H.keyFromText(f), Text.equal);
     };
 
@@ -108,7 +107,7 @@ module Collection {
         return #ok(out);
     };
 
-    public func getById(c : Collection.Value, id : Nat) : ?Document.PublicValue {
+    public func getById(c : Collection.Value, id : Nat) : ?PublicValue {
         switch(Trie.find(c.documents, {key = id; hash = Hash.hash(id)}, Nat.equal)) {
             case null return null;
             case (?v) return ?Document.toPublic(v);
